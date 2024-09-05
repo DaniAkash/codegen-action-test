@@ -1,0 +1,59 @@
+name: Generate Swagger Types
+
+on:
+  schedule:
+    - cron: '0 */12 * * *' # Runs every 12 hours
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  codegen:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup yarn
+        shell: bash
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Run yarn codegen
+        run: yarn codegen
+
+      - name: Check for changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes detected, skipping commit and PR creation."
+            exit 0
+          else
+            echo "Changes detected."
+          fi
+
+      - name: Add and commit changes
+        if: success()
+        uses: EndBug/add-and-commit@v9
+        with:
+          default_author: github_actions # Default author will be "GitHub Actions"
+          message: "Update codegen types"
+          add: '.' # Add all changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request
+        if: success()
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: codegen-update
+          commit-message: "Auto-update codegen types"
+          title: "Auto-update codegen types"
+          body: "This PR updates the codegen types."
+          base: master
+          branch-suffix: timestamp
